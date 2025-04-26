@@ -1,32 +1,28 @@
+import glob
+import os
+import numpy as np
 import torch
 from torch.utils.data import Dataset
-import numpy as np
-
-class DummyPointCloudDataset(Dataset):
-    def __init__(self, num_samples=1000, num_points=1024, num_classes=40, split='train'):
-        super(DummyPointCloudDataset, self).__init__()
-        self.num_samples = num_samples
-        self.num_points = num_points
-        self.num_classes = num_classes
-
-        np.random.seed(42)  
-        all_data = np.random.rand(num_samples, num_points, 3).astype(np.float32)
-        all_labels = np.random.randint(0, num_classes, size=(num_samples, 1)).astype(np.int64)
-
-        split_ratio = 0.8
-        split_index = int(num_samples * split_ratio)
-
-        if split == 'train':
-            self.data = all_data[:split_index]
-            self.labels = all_labels[:split_index]
-        else:
-            self.data = all_data[split_index:]
-            self.labels = all_labels[split_index:]
+class ModelNet40Dataset(torch.utils.data.Dataset):
+    def __init__(self, data_path, split='train'):
+        self.filepaths = []
+        self.labels = []
+        classes = sorted(os.listdir(data_path))
+        self.class_to_idx = {cls_name: idx for idx, cls_name in enumerate(classes)}
+        
+        for cls in classes:
+            cls_folder = os.path.join(data_path, cls, split)
+            if not os.path.isdir(cls_folder):
+                continue
+            for file in os.listdir(cls_folder):
+                if file.endswith('.npy'):
+                    self.filepaths.append(os.path.join(cls_folder, file))
+                    self.labels.append(self.class_to_idx[cls])
 
     def __len__(self):
-        return len(self.data)
+        return len(self.filepaths)
 
     def __getitem__(self, idx):
-        point_cloud = self.data[idx]
+        pointcloud = np.load(self.filepaths[idx])  
         label = self.labels[idx]
-        return torch.tensor(point_cloud), torch.tensor(label)
+        return torch.from_numpy(pointcloud).float(), label
